@@ -1314,15 +1314,41 @@ function renderConsumption(){
 function renderForecast(){
   const el=document.getElementById('forecast-cards');
   const nel=document.getElementById('forecast-notifs');
-  // Notifications panel
+
+  // ── Alert strip at top (critical/out only) ──
   const urgent=S.groceryItems.filter(i=>{const st=getItemStatus(i);return st==='critical'||st==='out';});
   const low=S.groceryItems.filter(i=>getItemStatus(i)==='low');
+  const warn=S.groceryItems.filter(i=>getItemStatus(i)==='warning');
   let notifHtml='';
-  if(urgent.length){notifHtml+=urgent.map(i=>{const {estimated}=calcStock(i.id);const f=getForecast(i.id);return`<div class="notif-item"><div class="notif-icon">🔴</div><div class="notif-body"><div class="title">${getItemStatus(i)==='out'?'Out of Stock':'Critical Stock'}: ${i.name}</div><div class="sub">~${fN(estimated)} ${i.unit} remaining${f?.runOutDate?' · Est. run-out: '+fmtD(f.runOutDate):''}</div></div><button class="btn btn-p btn-sm" onclick="openAddPurchase('${i.id}')">Buy Now</button></div>`;}).join('');}
-  if(low.length){notifHtml+=low.map(i=>{const {estimated}=calcStock(i.id);const f=getForecast(i.id);return`<div class="notif-item"><div class="notif-icon">🟡</div><div class="notif-body"><div class="title">Low Stock: ${i.name}</div><div class="sub">~${fN(estimated)} ${i.unit} · ${f?.daysLeft!=null?'~'+f.daysLeft+' days left':''}</div></div><button class="btn btn-s btn-sm" onclick="openAddPurchase('${i.id}')">Buy</button></div>`;}).join('');}
+  if(urgent.length){notifHtml+=urgent.map(i=>{
+    const {estimated}=calcStock(i.id);const f=getForecast(i.id);const st=getItemStatus(i);
+    return`<div class="notif-item">
+      <div class="notif-icon">${st==='out'?'🔴':'⚠️'}</div>
+      <div class="notif-body">
+        <div class="title">${st==='out'?'Out of Stock':'Critical'}: ${i.name}</div>
+        <div class="sub">~${fmtQty(estimated,i.unit)} remaining${f?.daysLeft!=null?' · '+f.daysLeft+' days left':''}</div>
+      </div>
+      <button class="btn btn-p btn-sm" onclick="openAddPurchase('${i.id}')">Buy</button>
+    </div>`;
+  }).join('');}
+  if(low.length){notifHtml+=low.map(i=>{
+    const {estimated}=calcStock(i.id);const f=getForecast(i.id);
+    return`<div class="notif-item">
+      <div class="notif-icon">🟡</div>
+      <div class="notif-body">
+        <div class="title">Low Stock: ${i.name}</div>
+        <div class="sub">~${fmtQty(estimated,i.unit)}${f?.daysLeft!=null?' · ~'+f.daysLeft+' days':''}</div>
+      </div>
+      <button class="btn btn-s btn-sm" onclick="openAddPurchase('${i.id}')">Buy</button>
+    </div>`;
+  }).join('');}
+  if(warn.length&&!urgent.length&&!low.length){notifHtml+=`<div class="notif-item"><div class="notif-icon">⚡</div><div class="notif-body"><div class="title">Running low soon: ${warn.map(i=>i.name).join(', ')}</div></div></div>`;}
   if(nel)nel.innerHTML=notifHtml?`<div class="card mb16">${notifHtml}</div>`:'';
 
-  if(!S.groceryItems.length){el.innerHTML=`<div class="card"><div class="empty"><div class="empty-ico">📊</div><h3>No items yet</h3><p>Add grocery items and set daily rates to see forecasts.</p></div></div>`;return;}
+  if(!S.groceryItems.length){
+    el.innerHTML=`<div class="card"><div class="empty"><div class="empty-ico">📊</div><h3>No items yet</h3><p>Add grocery items and set daily rates to see forecasts.</p></div></div>`;
+    return;
+  }
 
   el.innerHTML=S.groceryItems.map(item=>{
     const {estimated,actual,hasRate,confidence,rate}=calcStock(item.id);
@@ -1331,34 +1357,52 @@ function renderForecast(){
     const stBadge=st==='out'?'bd':st==='critical'?'badge-crit':st==='low'?'bw':st==='warning'?'b-warn':'bs';
     const stLabel=st==='out'?'Out of Stock':st==='critical'?'⚠ Critical':st==='low'?'Running Low':st==='warning'?'⚡ Low Soon':'✓ Good';
     const low=item.minimumStock||0;const crit=item.criticalStock||0;
-    const maxStock=Math.max(estimated,low*2,1);
-    const fillPct=clamp(estimated/maxStock*100,0,100);
-    const fillColor=st==='out'?'var(--danger)':st==='critical'?'#F97316':st==='low'?'var(--warning)':'var(--success)';
-    // Reorder suggestion
-    const confCls=confidence==='high'?'conf-high':confidence==='medium'?'conf-med':'conf-low';
+    const maxStock=Math.max(estimated,low*2,rate?rate*30:1,0.001);
+    const fillPct=Math.min(100,Math.max(0,estimated/maxStock*100));
+    const fillColor=st==='out'?'var(--danger)':st==='critical'?'#F97316':st==='low'?'var(--warning)':st==='warning'?'#EAB308':'var(--success)';
+    const daysColor=f?.daysLeft!=null&&f.daysLeft<=3?'td':f?.daysLeft!=null&&f.daysLeft<=7?'tw2':f?.daysLeft!=null&&f.daysLeft<=14?'tw2':'';
+
+    // Reorder nudge — only show if run-out is within 14 days
+    const urgentReorder=f?.runOutDate&&dBetween(today(),f.runOutDate)<=14;
+
     return`<div class="forecast-card">
+      <!-- Header -->
       <div class="flex aic jb" style="margin-bottom:10px">
-        <div><div class="fw7" style="font-size:14px;cursor:pointer;color:var(--primary)" onclick="openItemDetail('${item.id}')">${item.name}</div>
-          <div class="ts tm2">${item.category||''}</div></div>
+        <div>
+          <div class="fw7" style="font-size:14px;cursor:pointer;color:var(--primary)" onclick="openItemDetail('${item.id}')">${item.name}</div>
+          <div class="ts tm2">${item.category||''}</div>
+        </div>
         <span class="badge ${stBadge}">${stLabel}</span>
       </div>
-      <div style="background:var(--bg);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px">
-        <div class="flex jb ts mb4"><span>Est. Stock</span><span class="fw6">~${fmtQty(estimated,item.unit)} <span class="est-tag">EST</span></span></div>
-        ${actual?`<div class="flex jb ts mb4"><span>Last Actual Check</span><span class="fw6">${fN(actual.quantity)} ${item.unit} <span class="act-tag">ACTUAL</span> · ${fmtD(actual.date)}</span></div>`:''}
-        <div class="stock-prog"><div class="stock-prog-fill" style="width:${fillPct}%;background:${fillColor}"></div></div>
-        ${low?`<div class="flex jb" style="margin-top:4px;font-size:10px;color:var(--text2)"><span>Critical: ${fN(crit)} ${item.unit}</span><span>Low: ${fN(low)} ${item.unit}</span></div>`:''}
+
+      <!-- Stock bar -->
+      <div style="background:var(--bg);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px">
+        <div class="flex jb ts mb4">
+          <span class="tm2">Est. Stock</span>
+          <span class="fw6">~${fmtQty(estimated,item.unit)} <span class="est-tag">EST</span></span>
+        </div>
+        ${actual?`<div class="flex jb ts mb6"><span class="tm2">Last Check</span><span class="fw6">${fmtQty(actual.quantity,item.unit)} <span class="act-tag">ACTUAL</span> · ${fmtD(actual.date)}</span></div>`:''}
+        <div class="stock-prog">
+          <div class="stock-prog-fill" style="width:${fillPct}%;background:${fillColor}"></div>
+        </div>
+        ${(low||crit)?`<div class="flex jb" style="margin-top:4px;font-size:10px;color:var(--text2)">
+          ${crit?`<span>Critical: ${fmtQty(crit,item.unit)}</span>`:'<span></span>'}
+          ${low?`<span>Low: ${fmtQty(low,item.unit)}</span>`:''}
+        </div>`:''}
       </div>
-      ${hasRate?`
-      <div class="forecast-item"><span class="tm2">Active Daily Rate</span><span class="fw6">${fN(rate,2)} ${item.unit}/day</span></div>
-      <div class="forecast-item"><span class="tm2">Days Remaining</span><span class="fw6 ${f?.daysLeft!=null&&f.daysLeft<=7?'td':f?.daysLeft!=null&&f.daysLeft<=14?'tw2':''}">${f?.daysLeft!=null?f.daysLeft+' days':'—'}</span></div>
-      ${f?.lowDate?`<div class="forecast-item"><span class="tm2">Enters Low Stock</span><span class="fdate-warn fw6">${fmtD(f.lowDate)}</span></div>`:''}
-      ${f?.critDate?`<div class="forecast-item"><span class="tm2">Enters Critical</span><span class="fdate-crit fw6">${fmtD(f.critDate)}</span></div>`:''}
-      ${f?.runOutDate?`<div class="forecast-item"><span class="tm2">Est. Run-out</span><span class="fdate-crit fw6">${fmtD(f.runOutDate)}</span></div>`:''}
-      ${f?.reorderDate?`<div class="forecast-item"><span class="tm2">Suggested Reorder By</span><span class="fdate-warn fw6">${fmtD(f.reorderDate)}</span></div>`:''}
-      <div class="forecast-item"><span class="tm2">Data Confidence</span><span class="${confCls}">${confidence}</span></div>
-      `:`<div class="ts tm2" style="padding:8px 0">Set expected daily rate in item settings to enable forecasting.</div>`}
-      <div class="flex g8 mt8">
-        <button class="btn btn-s btn-sm" style="flex:1;justify-content:center" onclick="openStockCheck('${item.id}')">📊 Stock Check</button>
+
+      <!-- Key numbers — 2 column grid, clean -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 0;font-size:13px;margin-bottom:12px">
+        <span class="tm2">Daily Rate</span>
+        <span class="fw6" style="text-align:right">${hasRate?fmtQty(rate,item.unit)+'/day':'<span class="tm2">Not set</span>'}</span>
+        <span class="tm2">Days Remaining</span>
+        <span class="fw6 ${daysColor}" style="text-align:right">${f?.daysLeft!=null?f.daysLeft+' days':'—'}</span>
+        ${urgentReorder?`<span class="tm2">Reorder By</span><span class="fw6 tw2" style="text-align:right">${fmtD(f.reorderDate)}</span>`:''}
+      </div>
+
+      <!-- Action buttons -->
+      <div class="flex g8">
+        <button class="btn btn-s btn-sm" style="flex:1;justify-content:center" onclick="openStockCheck('${item.id}')">📊 Check</button>
         <button class="btn btn-p btn-sm" style="flex:1;justify-content:center" onclick="openAddPurchase('${item.id}')">Buy</button>
       </div>
     </div>`;
@@ -1385,64 +1429,217 @@ function renderConsumptionChart(){
   const statsEl=document.getElementById('cons-an-stats');
   const emptyEl=document.getElementById('cons-an-empty');
   const cc=cColors();
-  if(!itemId){if(statsEl)statsEl.style.display='none';if(emptyEl)emptyEl.style.display='flex';dChart('chart-cons-item');return;}
+
+  if(!itemId){
+    if(statsEl)statsEl.style.display='none';
+    if(emptyEl)emptyEl.style.display='flex';
+    dChart('chart-cons-item');return;
+  }
   const item=S.groceryItems.find(i=>i.id===itemId);
   if(!item){return;}
   if(emptyEl)emptyEl.style.display='none';
-  const rate=getActiveRate(itemId);const weekly=rate?rate*7:null;const monthly=rate?rate*30.44:null;
+
+  const rate=getActiveRate(itemId);
+  const weekly=rate?rate*7:null;
+  const monthly=rate?rate*30.44:null;
   const {estimated,actual,confidence}=calcStock(itemId);
-  const f=getForecast(itemId);const days=f?.daysLeft;
+  const f=getForecast(itemId);
+
+  // ── Mini stat cards ──
   if(statsEl){
     statsEl.style.display='grid';
     statsEl.innerHTML=[
-      {l:'Daily Rate',v:rate?fN(rate,2)+' '+item.unit+'/day':'Not set'},
-      {l:'Weekly',v:weekly?fN(weekly)+' '+item.unit:'—'},
-      {l:'Monthly',v:monthly?fN(monthly)+' '+item.unit:'—'},
-      {l:'Est. Stock',v:'~'+fN(estimated)+' '+item.unit},
-      {l:'Days Left',v:days!=null?days+' days':'—'},
+      {l:'Daily Rate',v:rate?fmtQty(rate,item.unit)+'/day':'Not set'},
+      {l:'Weekly',v:weekly?fmtQty(weekly,item.unit):'—'},
+      {l:'Monthly',v:monthly?fmtQty(monthly,item.unit):'—'},
+      {l:'Est. Stock',v:'~'+fmtQty(estimated,item.unit)},
+      {l:'Days Left',v:f?.daysLeft!=null?f.daysLeft+' days':'—'},
       {l:'Confidence',v:confidence},
     ].map(x=>`<div class="stat-card"><div class="stat-label">${x.l}</div><div class="stat-value" style="font-size:18px">${x.v}</div></div>`).join('');
   }
-  // Build chart from stock events + purchases
-  if(view==='monthly'){
-    const byMonth={};
-    // Use rate * 30.44 per month if we have a rate
-    if(rate){
-      const keys=getLastNMonthKeys(12);
-      for(const mk of keys)byMonth[mk]=+(rate*30.44).toFixed(3);
+
+  // ── Determine first purchase date (chart should not show months before item existed) ──
+  const purchases=getPurchasesSorted(itemId);
+  if(!purchases.length&&!rate){
+    dChart('chart-cons-item');
+    if(emptyEl){emptyEl.style.display='flex';emptyEl.innerHTML='<div class="empty-ico">📦</div><h3>No data yet</h3><p>Add a purchase and set a daily rate to see the chart.</p>';}
+    return;
+  }
+  const firstPurchaseDate=purchases.length?purchases[0].purchaseDate:today();
+  const firstMK=mKey(firstPurchaseDate);
+  const nowMK=mKey(today());
+
+  // ── Build month keys from first purchase to now ──
+  function monthKeysBetween(from,to){
+    const keys=[];let[fy,fm]=from.split('-').map(Number);const[ty,tm]=to.split('-').map(Number);
+    while(fy<ty||(fy===ty&&fm<=tm)){
+      keys.push(`${fy}-${String(fm).padStart(2,'0')}`);
+      fm++;if(fm>12){fm=1;fy++;}
     }
-    // Override with actual periods derived from stock checks
-    const checks=S.stockEvents.filter(e=>e.itemId===itemId&&e.eventType==='actual_check').sort((a,b)=>new Date(a.date)-new Date(b.date));
-    const purSorted=getPurchasesSorted(itemId);
+    return keys;
+  }
+  const allKeys=monthKeysBetween(firstMK,nowMK);
+
+  // ── Build consumption data per month ──
+  // Strategy: between consecutive stock checks, calculate actual consumption per month
+  // Otherwise use rate estimation
+  const checks=S.stockEvents
+    .filter(e=>e.itemId===itemId&&e.eventType==='actual_check')
+    .sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  // Build a timeline of known stock points: [date, quantityInGrams, source]
+  const timeline=[];
+  // Add purchases
+  purchases.forEach(p=>timeline.push({date:p.purchaseDate,qtyG:toGrams(p.quantity,p.unit||item.unit),type:'purchase'}));
+  // Add checks
+  checks.forEach(c=>timeline.push({date:c.date,qtyG:toGrams(c.quantity,c.unit||item.unit),type:'check'}));
+  timeline.sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  // For each month, calculate average daily consumption
+  const byMonth={};
+  const byMonthSource={}; // 'actual' or 'estimated'
+
+  // Walk through consecutive check pairs to derive actual consumption
+  if(checks.length>=2){
+    for(let i=1;i<checks.length;i++){
+      const prev=checks[i-1];const curr=checks[i];
+      const prevG=toGrams(prev.quantity,prev.unit||item.unit);
+      const currG=toGrams(curr.quantity,curr.unit||item.unit);
+      const days=Math.max(1,dBetween(prev.date,curr.date));
+      // Purchases between checks add stock
+      const purBetween=purchases.filter(p=>p.purchaseDate>prev.date&&p.purchaseDate<=curr.date);
+      const addedG=purBetween.reduce((a,p)=>a+toGrams(p.quantity,p.unit||item.unit),0);
+      const consumedG=prevG+addedG-currG;
+      if(consumedG>=0){
+        const dailyG=consumedG/days;
+        const mk=mKey(curr.date);
+        byMonth[mk]=(byMonth[mk]||0)+fromGrams(dailyG*30.44,item.unit);
+        byMonthSource[mk]='actual';
+      }
+    }
+  }
+
+  // Fill remaining months with rate-based estimate
+  allKeys.forEach(mk=>{
+    if(!byMonth[mk]&&rate){
+      byMonth[mk]=rate*30.44;
+      byMonthSource[mk]=byMonthSource[mk]||'estimated';
+    }
+  });
+
+  const relevantKeys=allKeys.filter(mk=>byMonth[mk]!=null);
+  if(!relevantKeys.length){
+    dChart('chart-cons-item');
+    if(emptyEl){emptyEl.style.display='flex';emptyEl.innerHTML='<div class="empty-ico">📦</div><h3>No consumption data</h3><p>Set a daily rate or perform stock checks.</p>';}
+    return;
+  }
+
+  if(view==='monthly'){
+    // Two datasets: actual (green) and estimated (indigo, slightly transparent)
+    const actualData=relevantKeys.map(mk=>byMonthSource[mk]==='actual'?+(byMonth[mk]).toFixed(3):null);
+    const estData=relevantKeys.map(mk=>byMonthSource[mk]!=='actual'?+(byMonth[mk]).toFixed(3):null);
+    const avgVal=rate?+(rate*30.44).toFixed(3):null;
+
+    const datasets=[];
+    if(actualData.some(v=>v!=null)){
+      datasets.push({
+        label:'Actual ('+item.unit+')',
+        data:actualData,
+        backgroundColor:'rgba(46,125,79,0.8)',
+        borderRadius:5,borderSkipped:false,type:'bar'
+      });
+    }
+    if(estData.some(v=>v!=null)){
+      datasets.push({
+        label:'Estimated ('+item.unit+')',
+        data:estData,
+        backgroundColor:'rgba(79,70,229,0.45)',
+        borderRadius:5,borderSkipped:false,type:'bar'
+      });
+    }
+    if(avgVal&&rate){
+      datasets.push({
+        label:'Avg Rate',
+        data:relevantKeys.map(()=>avgVal),
+        borderColor:'#F59E0B',borderWidth:2,
+        borderDash:[6,3],pointRadius:0,fill:false,type:'line',tension:0
+      });
+    }
+
+    mkChart('chart-cons-item',{
+      type:'bar',
+      data:{labels:relevantKeys.map(mLabel),datasets},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{display:datasets.length>1,labels:{color:cc.text,font:{size:11},boxWidth:12}},
+          tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmtQty(ctx.raw,item.unit)}`}}
+        },
+        scales:{
+          x:{grid:{color:cc.grid},ticks:{color:cc.text,font:{size:10}}},
+          y:{grid:{color:cc.grid},ticks:{color:cc.text,font:{size:10}},beginAtZero:true,
+            title:{display:true,text:item.unit+'/month',color:cc.text,font:{size:10}}}
+        }
+      }
+    });
+  } else {
+    // Weekly view — show week-level data from stock checks if available
+    const weeklyPoints=[];
     if(checks.length>=2){
       for(let i=1;i<checks.length;i++){
         const prev=checks[i-1];const curr=checks[i];
-        const mk=mKey(curr.date);
-        const consumed=toGrams(prev.quantity,prev.unit||item.unit)-toGrams(curr.quantity,curr.unit||item.unit);
-        // Add purchases between checks
-        const purBetween=purSorted.filter(p=>p.purchaseDate>prev.date&&p.purchaseDate<=curr.date);
-        const purQty=purBetween.reduce((a,p)=>a+toGrams(p.quantity,p.unit||item.unit),0);
-        const actual_consumed=consumed+purQty;
-        const days2=dBetween(prev.date,curr.date);
-        if(days2>0&&actual_consumed>=0){const dr=actual_consumed/days2;byMonth[mk]=+(dr*30.44).toFixed(3);}
+        const prevG=toGrams(prev.quantity,prev.unit||item.unit);
+        const currG=toGrams(curr.quantity,curr.unit||item.unit);
+        const days=Math.max(1,dBetween(prev.date,curr.date));
+        const purBetween=purchases.filter(p=>p.purchaseDate>prev.date&&p.purchaseDate<=curr.date);
+        const addedG=purBetween.reduce((a,p)=>a+toGrams(p.quantity,p.unit||item.unit),0);
+        const consumedG=prevG+addedG-currG;
+        if(consumedG>=0){
+          weeklyPoints.push({
+            label:fmtD(prev.date)+' → '+fmtD(curr.date),
+            value:fromGrams((consumedG/days)*7,item.unit),
+            source:'actual'
+          });
+        }
       }
     }
-    const sortedKeys=Object.keys(byMonth).sort();
-    if(!sortedKeys.length){dChart('chart-cons-item');if(emptyEl){emptyEl.style.display='flex';emptyEl.innerHTML='<div class="empty-ico">📦</div><h3>No data</h3><p>Set a daily rate or add stock checks to see consumption.</p>';}return;}
-    const avgVal=rate?+(rate*30.44).toFixed(3):null;
-    const datasets=[{label:`Monthly (${item.unit})`,data:sortedKeys.map(k=>byMonth[k]),backgroundColor:'rgba(79,70,229,0.7)',borderRadius:5,borderSkipped:false,type:'bar'}];
-    if(avgVal)datasets.push({label:'Active Rate',data:sortedKeys.map(()=>avgVal),borderColor:'#F59E0B',borderWidth:2,borderDash:[6,3],pointRadius:0,fill:false,type:'line',tension:0});
-    mkChart('chart-cons-item',{type:'bar',data:{labels:sortedKeys.map(mLabel),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:cc.text,font:{size:11},boxWidth:14}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${fN(ctx.raw,2)} ${item.unit}`}}},scales:{x:{grid:{color:cc.grid},ticks:{color:cc.text,font:{size:10}}},y:{grid:{color:cc.grid},ticks:{color:cc.text,font:{size:10}},beginAtZero:true,title:{display:true,text:`Quantity (${item.unit})`,color:cc.text,font:{size:10}}}}}});
-  } else {
-    const checks=S.stockEvents.filter(e=>e.itemId===itemId&&e.eventType==='actual_check').sort((a,b)=>new Date(a.date)-new Date(b.date));
-    const weeklyData={};
-    if(rate){const keys=getLastNMonthKeys(12);for(const mk of keys)weeklyData[mk]=+(rate*7).toFixed(3);}
-    const labels=Object.keys(weeklyData).sort();
-    if(!labels.length){dChart('chart-cons-item');if(emptyEl){emptyEl.style.display='flex';emptyEl.innerHTML='<div class="empty-ico">📦</div><h3>No data</h3>';}return;}
-    const avgVal=rate?+(rate*7).toFixed(3):null;
-    const datasets=[{label:`Weekly (${item.unit})`,data:labels.map(k=>weeklyData[k]),borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,0.15)',fill:true,tension:0.35,pointRadius:4,pointBackgroundColor:'#7C3AED',type:'line'}];
-    if(avgVal)datasets.push({label:'Active Rate',data:labels.map(()=>avgVal),borderColor:'#F59E0B',borderWidth:2,borderDash:[6,3],pointRadius:0,fill:false,type:'line'});
-    mkChart('chart-cons-item',{type:'line',data:{labels:labels.map(mLabel),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:cc.text,font:{size:11},boxWidth:14}}},scales:{x:{grid:{color:cc.grid},ticks:{color:cc.text,font:{size:10}}},y:{grid:{color:cc.grid},ticks:{color:cc.text,font:{size:10}},beginAtZero:true,title:{display:true,text:`Quantity (${item.unit})`,color:cc.text,font:{size:10}}}}}});
+    // Add current estimated week
+    if(rate){
+      weeklyPoints.push({
+        label:'Now (est.)',
+        value:rate*7,
+        source:'estimated'
+      });
+    }
+    if(!weeklyPoints.length){
+      dChart('chart-cons-item');
+      if(emptyEl){emptyEl.style.display='flex';emptyEl.innerHTML='<div class="empty-ico">📦</div><h3>Need 2+ stock checks</h3><p>For weekly actual data, perform at least 2 stock checks.</p>';}
+      return;
+    }
+    const colors=weeklyPoints.map(p=>p.source==='actual'?'rgba(46,125,79,0.8)':'rgba(79,70,229,0.5)');
+    mkChart('chart-cons-item',{
+      type:'bar',
+      data:{
+        labels:weeklyPoints.map(p=>p.label),
+        datasets:[{
+          label:'Weekly Consumption ('+item.unit+')',
+          data:weeklyPoints.map(p=>+p.value.toFixed(3)),
+          backgroundColor:colors,borderRadius:5,borderSkipped:false
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:ctx=>`${fmtQty(ctx.raw,item.unit)}/week`}}
+        },
+        scales:{
+          x:{grid:{color:cc.grid},ticks:{color:cc.text,font:{size:10},maxRotation:30}},
+          y:{grid:{color:cc.grid},ticks:{color:cc.text,font:{size:10}},beginAtZero:true,
+            title:{display:true,text:item.unit+'/week',color:cc.text,font:{size:10}}}
+        }
+      }
+    });
   }
 }
 
