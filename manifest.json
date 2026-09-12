@@ -1,0 +1,95 @@
+{
+  "name": "Grocery Tracker — Household Consumption Tracker",
+  "short_name": "Grocery Tracker",
+  "description": "Track household grocery consumption automatically. Set daily rates, get low-stock alerts, and never run out.",
+  "start_url": "/GroceryTracker/",
+  "scope": "/GroceryTracker/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#1B5E35",
+  "background_color": "#F5F0E8",
+  "lang": "en",
+  "categories": ["productivity", "utilities", "food"],
+  "icons": [
+    {
+      "src": "icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Purchase",
+      "short_name": "Add Purchase",
+      "description": "Quickly record a new purchase",
+      "url": "/GroceryTracker/?action=add-purchase",
+      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "View Inventory",
+      "short_name": "Inventory",
+      "description": "Check current stock levels",
+      "url": "/GroceryTracker/?page=inventory",
+      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/dashboard.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard overview"
+    },
+    {
+      "src": "screenshots/mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile inventory view"
+    }
+  ]
+}
