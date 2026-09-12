@@ -75,21 +75,5 @@
       "url": "/GroceryTracker/?page=inventory",
       "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
     }
-  ],
-  "screenshots": [
-    {
-      "src": "screenshots/dashboard.png",
-      "sizes": "1280x800",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Dashboard overview"
-    },
-    {
-      "src": "screenshots/mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Mobile inventory view"
-    }
   ]
 }
