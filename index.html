@@ -12,6 +12,11 @@
 <meta name="apple-mobile-web-app-title" content="Grocery Tracker">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="Track household grocery consumption automatically. Set daily rates, get low-stock alerts, and never run out.">
+<link rel="manifest" href="manifest.json">
+<!-- Firebase v9 compat (CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root {
   /* ── Green-Beige Theme (Grocery Tracker) ── */
@@ -307,9 +312,97 @@ label{font-size:12.5px;font-weight:600;color:var(--text2);}
 .notif-icon{font-size:20px;flex-shrink:0;margin-top:2px}
 .notif-body .title{font-weight:600;font-size:13px}
 .notif-body .sub{font-size:12px;color:var(--text2);margin-top:2px}
+
+/* ── AUTH ── */
+#auth-screen{position:fixed;inset:0;background:linear-gradient(135deg,var(--primary-light) 0%,var(--bg) 100%);z-index:2000;display:none;align-items:center;justify-content:center;}
+#auth-screen.open{display:flex;}
+.auth-card{background:var(--card);border-radius:20px;box-shadow:0 8px 40px rgba(27,94,53,.18);padding:40px 44px;max-width:400px;width:100%;border:1px solid var(--border);}
+.auth-card h2{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+.auth-card p{color:var(--text2);font-size:13px;margin-bottom:24px;}
+.auth-divider{text-align:center;color:var(--text3);font-size:12px;margin:16px 0;position:relative;}
+.auth-divider::before,.auth-divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border);}
+.auth-divider::before{left:0;}.auth-divider::after{right:0;}
+.auth-err{background:var(--danger-light);color:var(--danger);border-radius:var(--radius-sm);padding:8px 12px;font-size:12.5px;font-weight:500;margin-bottom:12px;display:none;}
+.auth-err.show{display:block;}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:10px;border-radius:var(--radius-sm);border:1.5px solid var(--border);background:var(--card);font-size:13.5px;font-weight:600;cursor:pointer;color:var(--text);transition:all var(--tr);}
+.google-btn:hover{border-color:var(--primary);background:var(--primary-light);}
+.auth-user-bar{display:none;align-items:center;gap:8px;}
+.auth-user-bar.show{display:flex;}
+.auth-avatar{width:28px;height:28px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden;}
+.auth-avatar img{width:100%;height:100%;object-fit:cover;}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s;}
+.sync-dot.syncing{background:var(--warning);animation:pulse .8s infinite;}
+.sync-dot.ok{background:var(--success);}
+.sync-dot.err{background:var(--danger);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── PWA INSTALL ── */
+#pwa-install-btn{display:none;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius-sm);background:var(--primary);color:white;border:none;font-size:12.5px;font-weight:600;cursor:pointer;transition:opacity var(--tr);}
+#pwa-install-btn:hover{opacity:.88;}
+#pwa-install-btn.show{display:flex;}
+#pwa-banner{display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(27,94,53,.18);padding:16px 20px;max-width:340px;width:90%;z-index:800;animation:slideUp .25s ease;}
+#pwa-banner.open{display:flex;flex-direction:column;gap:10px;}
+.pwa-banner-row{display:flex;align-items:center;gap:12px;}
+.pwa-banner-icon{width:48px;height:48px;border-radius:12px;overflow:hidden;flex-shrink:0;}
+.pwa-banner-title{font-size:14px;font-weight:700;}
+.pwa-banner-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.pwa-banner-btns{display:flex;gap:8px;justify-content:flex-end;}
 </style>
 </head>
 <body>
+
+<!-- ══ AUTH SCREEN ══ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+      <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAB3RJTUUH6AcBDgQhvUWqzAAAADdJREFUaN7twQENAAAAwqD3T20PBxQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4AAxoAAFWMgTaAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI0LTA3LTAxVDE0OjA0OjMzKzAwOjAwhZLEJgAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNC0wNy0wMVQxNDowNDozMyswMDowMPTPfJoAAAAASUVORK5CYII=" style="display:none">
+      <div style="width:44px;height:44px;background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-size:22px;">🛒</div>
+      <div>
+        <div style="font-size:16px;font-weight:800;letter-spacing:-.3px;">Grocery Tracker</div>
+        <div style="font-size:11px;color:var(--text2);">Household Consumption Tracker</div>
+      </div>
+    </div>
+    <h2>Sign in to sync</h2>
+    <p>Your data syncs across all devices in real time. Sign in to get started or continue as a guest.</p>
+    <div id="auth-err" class="auth-err"></div>
+    <button class="google-btn" onclick="signInGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+      Continue with Google
+    </button>
+    <div class="auth-divider">or</div>
+    <div id="auth-email-form" style="display:flex;flex-direction:column;gap:10px;">
+      <input class="fc" id="auth-email" type="email" placeholder="Email address" autocomplete="email">
+      <input class="fc" id="auth-password" type="password" placeholder="Password (6+ chars)" autocomplete="current-password">
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-p" style="flex:1;justify-content:center;" onclick="signInEmail()">Sign In</button>
+        <button class="btn btn-s" style="flex:1;justify-content:center;" onclick="signUpEmail()">Sign Up</button>
+      </div>
+    </div>
+    <button class="btn btn-s" style="width:100%;justify-content:center;margin-top:10px;" onclick="continueAsGuest()">
+      Continue as Guest (local only)
+    </button>
+    <p style="font-size:11px;color:var(--text3);text-align:center;margin-top:14px;line-height:1.5;">Guest mode stores data on this device only.<br>Sign in to sync across devices.</p>
+  </div>
+</div>
+
+<!-- ══ PWA INSTALL BANNER ══ -->
+<div id="pwa-banner">
+  <div class="pwa-banner-row">
+    <div class="pwa-banner-icon">
+      <img src="icons/icon-192.png" onerror="this.style.display='none'" width="48" height="48" style="border-radius:12px;" alt="">
+      <div style="width:48px;height:48px;background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:12px;display:flex;align-items:center;justify-content:center;color:white;font-size:24px;position:relative;top:-48px;">🛒</div>
+    </div>
+    <div>
+      <div class="pwa-banner-title">Install Grocery Tracker</div>
+      <div class="pwa-banner-sub">Add to home screen for quick access, works offline too.</div>
+    </div>
+  </div>
+  <div class="pwa-banner-btns">
+    <button class="btn btn-s btn-sm" onclick="dismissPWABanner()">Not now</button>
+    <button class="btn btn-p btn-sm" onclick="triggerInstall()">Install</button>
+  </div>
+</div>
+
 <div id="welcome-screen">
   <div class="wcard">
     <div class="wlogo" style="background:none;padding:2px;overflow:hidden;width:84px;height:84px;border-radius:20px;margin:0 auto 20px">
@@ -358,6 +451,17 @@ label{font-size:12.5px;font-weight:600;color:var(--text2);}
           <div id="search-results"></div>
         </div>
         <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+        <!-- PWA Install button -->
+        <button id="pwa-install-btn" onclick="showPWABanner()" title="Install app">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Install
+        </button>
+        <!-- Auth user bar -->
+        <div class="auth-user-bar" id="auth-user-bar">
+          <div class="sync-dot" id="sync-dot" title="Sync status"></div>
+          <div class="auth-avatar" id="auth-avatar" onclick="showAuthMenu()" style="cursor:pointer;" title="Account"></div>
+        </div>
+        <button class="btn btn-p btn-sm" id="sign-in-btn" onclick="openAuthScreen()" style="display:none;">Sign In</button>
       </div>
     </div>
     <div id="page-content">
@@ -2334,6 +2438,376 @@ function init(){
 }
 init();
 
+</script>
+
+<!-- ══ AUTH CONTEXT MENU ══ -->
+<div id="auth-menu" style="display:none;position:fixed;top:56px;right:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);min-width:220px;z-index:600;padding:8px 0;">
+  <div style="padding:10px 16px;border-bottom:1px solid var(--border);">
+    <div id="menu-name" style="font-weight:600;font-size:13px;"></div>
+    <div id="menu-email" style="font-size:11px;color:var(--text2);margin-top:2px;word-break:break-all;"></div>
+  </div>
+  <div style="padding:4px 0;">
+    <div onclick="exportDataJSON()" style="padding:9px 16px;font-size:13px;cursor:pointer;transition:background var(--tr);" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''">⬇ Export My Data</div>
+    <div onclick="signOutUser()" style="padding:9px 16px;font-size:13px;cursor:pointer;color:var(--danger);transition:background var(--tr);" onmouseover="this.style.background='var(--danger-light)'" onmouseout="this.style.background=''">Sign Out</div>
+  </div>
+</div>
+<div id="auth-menu-overlay" style="display:none;position:fixed;inset:0;z-index:590;" onclick="closeAuthMenu()"></div>
+
+<!-- ══ FIREBASE + PWA + AUTH LOGIC ══ -->
+<script>
+// ════════════════════════════════════════════════════
+//  FIREBASE CONFIG  ← your project credentials
+// ════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDWMGmE1JzNXrannViJtslu3ylzWGTzdN8",
+  authDomain: "grocery-tracker-43d18.firebaseapp.com",
+  projectId: "grocery-tracker-43d18",
+  storageBucket: "grocery-tracker-43d18.firebasestorage.app",
+  messagingSenderId: "890555101850",
+  appId: "1:890555101850:web:789595f6d6f4883db1e523"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// ════════════════════════════════════════════════════
+//  GLOBALS
+// ════════════════════════════════════════════════════
+let currentUser   = null;   // Firebase user object
+let isGuestMode   = false;  // true = no Firebase sync
+let firestoreDoc  = null;   // reference to user doc
+let syncDebounce  = null;   // timer for batched saves
+const GUEST_KEY   = 'grocerytrack_guest';
+
+// ════════════════════════════════════════════════════
+//  AUTH SCREEN
+// ════════════════════════════════════════════════════
+function openAuthScreen(){
+  document.getElementById('auth-screen').classList.add('open');
+  clearAuthErr();
+}
+function closeAuthScreen(){
+  document.getElementById('auth-screen').classList.remove('open');
+}
+function clearAuthErr(){
+  const el=document.getElementById('auth-err');
+  el.classList.remove('show');
+  el.textContent='';
+}
+function showAuthErr(msg){
+  const el=document.getElementById('auth-err');
+  el.textContent=msg;
+  el.classList.add('show');
+}
+
+async function signInGoogle(){
+  clearAuthErr();
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+    // onAuthStateChanged will handle the rest
+  }catch(e){
+    if(e.code!=='auth/popup-closed-by-user')
+      showAuthErr(friendlyAuthErr(e));
+  }
+}
+
+async function signInEmail(){
+  clearAuthErr();
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-password').value;
+  if(!email||!pass){showAuthErr('Enter email and password.');return;}
+  try{
+    await auth.signInWithEmailAndPassword(email,pass);
+  }catch(e){showAuthErr(friendlyAuthErr(e));}
+}
+
+async function signUpEmail(){
+  clearAuthErr();
+  const email=document.getElementById('auth-email').value.trim();
+  const pass=document.getElementById('auth-password').value;
+  if(!email||!pass){showAuthErr('Enter email and password.');return;}
+  if(pass.length<6){showAuthErr('Password must be at least 6 characters.');return;}
+  try{
+    await auth.createUserWithEmailAndPassword(email,pass);
+  }catch(e){showAuthErr(friendlyAuthErr(e));}
+}
+
+function continueAsGuest(){
+  isGuestMode=true;
+  currentUser=null;
+  closeAuthScreen();
+  // Save to local-only key
+  updateAuthUI();
+  // load from localStorage (already done in init)
+  if(!S.settings.initialized&&!S.groceryItems.length){
+    document.getElementById('welcome-screen').style.display='flex';
+  }else{
+    document.getElementById('welcome-screen').style.display='none';
+    renderDashboard();
+  }
+}
+
+function friendlyAuthErr(e){
+  const map={
+    'auth/user-not-found':'No account found with that email.',
+    'auth/wrong-password':'Incorrect password.',
+    'auth/email-already-in-use':'That email is already registered. Try signing in.',
+    'auth/invalid-email':'Please enter a valid email address.',
+    'auth/weak-password':'Password too weak — use at least 6 characters.',
+    'auth/too-many-requests':'Too many attempts. Wait a moment and try again.',
+    'auth/network-request-failed':'Network error. Check your connection.',
+  };
+  return map[e.code]||e.message||'Something went wrong.';
+}
+
+// ════════════════════════════════════════════════════
+//  AUTH STATE OBSERVER
+// ════════════════════════════════════════════════════
+auth.onAuthStateChanged(async user=>{
+  if(user){
+    currentUser=user;
+    isGuestMode=false;
+    closeAuthScreen();
+    firestoreDoc=db.collection('users').doc(user.uid).collection('data').doc('state');
+    updateAuthUI();
+    await loadFromFirestore();
+  }else{
+    currentUser=null;
+    // Don't auto-open auth if already in guest mode
+    if(!isGuestMode){
+      // Check if user ever initialized as guest
+      const guestRaw=localStorage.getItem(GUEST_KEY);
+      const mainRaw=localStorage.getItem(KEY);
+      if(guestRaw||mainRaw){
+        // Has local data — continue as guest silently
+        isGuestMode=true;
+        updateAuthUI();
+        // show sign-in button so they can sign in later
+        document.getElementById('sign-in-btn').style.display='flex';
+      }else{
+        openAuthScreen();
+      }
+    }
+    firestoreDoc=null;
+    updateAuthUI();
+  }
+});
+
+// ════════════════════════════════════════════════════
+//  FIRESTORE SYNC
+// ════════════════════════════════════════════════════
+function setSyncDot(state){
+  // state: 'syncing'|'ok'|'err'|''
+  const dot=document.getElementById('sync-dot');
+  if(!dot)return;
+  dot.className='sync-dot '+state;
+  dot.title=state==='syncing'?'Syncing…':state==='ok'?'Synced':state==='err'?'Sync error':'';
+}
+
+async function loadFromFirestore(){
+  if(!firestoreDoc)return;
+  setSyncDot('syncing');
+  try{
+    const snap=await firestoreDoc.get();
+    if(snap.exists){
+      const data=snap.data();
+      // Merge with defaults
+      S={...S,...data};
+      // Ensure arrays
+      if(!S.stockEvents)S.stockEvents=[];
+      if(!S.rateHistory)S.rateHistory=[];
+      if(!S.notifState)S.notifState={};
+      S.groceryItems=(S.groceryItems||[]).map(i=>({
+        expectedDailyRate:null,activeDailyRate:null,
+        criticalStock:0,stockCheckInterval:14,...i
+      }));
+    }
+    setSyncDot('ok');
+    // Apply to UI
+    if(!S.settings.initialized&&!S.groceryItems.length){
+      document.getElementById('welcome-screen').style.display='flex';
+    }else{
+      document.getElementById('welcome-screen').style.display='none';
+      renderDashboard();
+    }
+    document.getElementById('hname').textContent=S.settings.householdName||'My Home';
+    applyTheme();
+  }catch(e){
+    console.error('Firestore load error',e);
+    setSyncDot('err');
+    toast('Could not load cloud data. Using local data.','warn');
+    // Fall back to localStorage
+    load();
+    if(!S.settings.initialized&&!S.groceryItems.length){
+      document.getElementById('welcome-screen').style.display='flex';
+    }else{
+      document.getElementById('welcome-screen').style.display='none';
+      renderDashboard();
+    }
+  }
+}
+
+async function saveToFirestore(){
+  if(!firestoreDoc||!currentUser)return;
+  setSyncDot('syncing');
+  try{
+    // Firestore has 1MB doc limit — state should be well under for typical household
+    await firestoreDoc.set(JSON.parse(JSON.stringify(S)));
+    setSyncDot('ok');
+  }catch(e){
+    console.error('Firestore save error',e);
+    setSyncDot('err');
+    // Don't show toast every save — only if repeated
+  }
+}
+
+// Debounced save: replaces the original save() for cloud users
+// We re-define save() so all existing code just works
+const _origSave=save; // keep local save
+// Override global save
+window._save=save;
+(function(){
+  const origSave=window.save;
+  window.save=function(){
+    // Always save to localStorage as backup
+    try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+    // If authenticated, debounce Firestore write
+    if(currentUser&&firestoreDoc){
+      clearTimeout(syncDebounce);
+      syncDebounce=setTimeout(saveToFirestore,1500);
+    }
+  };
+})();
+
+// ════════════════════════════════════════════════════
+//  AUTH UI
+// ════════════════════════════════════════════════════
+function updateAuthUI(){
+  const bar=document.getElementById('auth-user-bar');
+  const avatar=document.getElementById('auth-avatar');
+  const signInBtn=document.getElementById('sign-in-btn');
+  if(currentUser){
+    bar.classList.add('show');
+    signInBtn.style.display='none';
+    // Set avatar
+    if(currentUser.photoURL){
+      avatar.innerHTML=`<img src="${currentUser.photoURL}" alt="avatar">`;
+    }else{
+      const initials=(currentUser.displayName||currentUser.email||'U').charAt(0).toUpperCase();
+      avatar.textContent=initials;
+    }
+    // Menu info
+    document.getElementById('menu-name').textContent=currentUser.displayName||'Signed In';
+    document.getElementById('menu-email').textContent=currentUser.email||'';
+  }else if(isGuestMode){
+    bar.classList.remove('show');
+    signInBtn.style.display='flex';
+    setSyncDot('');
+  }else{
+    bar.classList.remove('show');
+    signInBtn.style.display='flex';
+  }
+}
+
+function showAuthMenu(){
+  document.getElementById('auth-menu').style.display='block';
+  document.getElementById('auth-menu-overlay').style.display='block';
+}
+function closeAuthMenu(){
+  document.getElementById('auth-menu').style.display='none';
+  document.getElementById('auth-menu-overlay').style.display='none';
+}
+
+async function signOutUser(){
+  closeAuthMenu();
+  if(confirm('Sign out? Your data is saved in the cloud.')){
+    await auth.signOut();
+    isGuestMode=false;
+    currentUser=null;
+    firestoreDoc=null;
+    updateAuthUI();
+    openAuthScreen();
+  }
+}
+
+function exportDataJSON(){
+  closeAuthMenu();
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='grocery-tracker-backup.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('Data exported as JSON.','info');
+}
+
+// ════════════════════════════════════════════════════
+//  PWA / INSTALL PROMPT
+// ════════════════════════════════════════════════════
+let deferredInstallPrompt=null;
+
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredInstallPrompt=e;
+  // Show install button in topbar
+  const btn=document.getElementById('pwa-install-btn');
+  btn.classList.add('show');
+  // Auto-show banner after 10s if not dismissed
+  const dismissed=localStorage.getItem('pwa_banner_dismissed');
+  if(!dismissed){
+    setTimeout(()=>showPWABanner(),10000);
+  }
+});
+
+window.addEventListener('appinstalled',()=>{
+  deferredInstallPrompt=null;
+  document.getElementById('pwa-install-btn').classList.remove('show');
+  dismissPWABanner();
+  toast('App installed! You can now open it from your home screen.','ok');
+});
+
+function showPWABanner(){
+  if(!deferredInstallPrompt)return;
+  document.getElementById('pwa-banner').classList.add('open');
+}
+
+function dismissPWABanner(){
+  document.getElementById('pwa-banner').classList.remove('open');
+  localStorage.setItem('pwa_banner_dismissed','1');
+}
+
+async function triggerInstall(){
+  dismissPWABanner();
+  if(!deferredInstallPrompt)return;
+  deferredInstallPrompt.prompt();
+  const{outcome}=await deferredInstallPrompt.userChoice;
+  if(outcome==='accepted'){
+    deferredInstallPrompt=null;
+    document.getElementById('pwa-install-btn').classList.remove('show');
+  }
+}
+
+// ════════════════════════════════════════════════════
+//  SERVICE WORKER REGISTRATION
+// ════════════════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg=>{
+        console.log('[SW] registered, scope:',reg.scope);
+        reg.addEventListener('updatefound',()=>{
+          const nw=reg.installing;
+          nw.addEventListener('statechange',()=>{
+            if(nw.state==='installed'&&navigator.serviceWorker.controller){
+              toast('App updated! Refresh to get the latest version.','info');
+            }
+          });
+        });
+      })
+      .catch(err=>console.warn('[SW] registration failed:',err));
+  });
+}
 </script>
 </body>
 </html>
