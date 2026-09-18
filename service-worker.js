@@ -5,7 +5,7 @@
  * HOW TO UPDATE: bump CACHE_VERSION when you deploy a new HTML/JS build.
  */
 
-const CACHE_VERSION = 'gt-v1';
+const CACHE_VERSION = 'gt-v2';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
