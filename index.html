@@ -798,7 +798,7 @@ const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 // ═══════════════════════════════════════════════════════
 //  STORAGE & MIGRATION
 // ═══════════════════════════════════════════════════════
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
+let save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
 
 function load(){
   try{
@@ -2672,23 +2672,19 @@ async function saveToFirestore(){
   }
 }
 
-// Debounced save: replaces the original save() for cloud users
-// We re-define save() so all existing code just works
-const _origSave=save; // keep local save
-// Override global save
-window._save=save;
-(function(){
-  const origSave=window.save;
-  window.save=function(){
-    // Always save to localStorage as backup
-    try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
-    // If authenticated, debounce Firestore write
-    if(currentUser&&firestoreDoc){
-      clearTimeout(syncDebounce);
-      syncDebounce=setTimeout(saveToFirestore,1500);
-    }
-  };
-})();
+// Debounced save: replaces the original localStorage-only save() so every
+// existing call site (saveItem, savePurchase, saveStockCheck, etc.) picks up
+// Firestore sync automatically — this reassigns the actual `save` binding
+// declared with `let` above, not a window property nothing calls.
+save=function(){
+  // Always save to localStorage as backup / offline cache
+  try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  // If authenticated, debounce Firestore write
+  if(currentUser&&firestoreDoc){
+    clearTimeout(syncDebounce);
+    syncDebounce=setTimeout(saveToFirestore,1500);
+  }
+};
 
 // ════════════════════════════════════════════════════
 //  AUTH UI
